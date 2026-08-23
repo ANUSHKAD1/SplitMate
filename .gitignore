@@ -1,0 +1,14 @@
+# Local environment files
+.env
+backend/.env
+frontend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+/backend/venv/
+
+# Node.js / Vite
+node_modules/
+dist/

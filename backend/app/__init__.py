@@ -1,0 +1,1 @@
+"""SplitMate backend application package."""
