@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     database_url: str = Field(validation_alias="DATABASE_URL")
+    jwt_secret_key: str = Field(validation_alias="JWT_SECRET_KEY", min_length=32)
 
     model_config = SettingsConfigDict(
         env_file=".env",
