@@ -44,6 +44,7 @@ def test_valid_login_returns_access_token(
     assert response.status_code == 200
     assert response.json()["token_type"] == "bearer"
     assert isinstance(response.json()["access_token"], str)
+    assert isinstance(response.json()["refresh_token"], str)
 
 
 def test_wrong_password_is_rejected(
@@ -94,6 +95,6 @@ def test_login_response_does_not_include_password_data(
     response = login(registered_credentials)
 
     assert response.status_code == 200
-    assert set(response.json()) == {"access_token", "token_type"}
+    assert set(response.json()) == {"access_token", "refresh_token", "token_type"}
     assert "password" not in response.json()
     assert "password_hash" not in response.json()

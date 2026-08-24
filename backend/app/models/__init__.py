@@ -1,4 +1,13 @@
-from app.models.entities import Activity, Expense, ExpenseSplit, Group, Membership, Settlement, User
+from app.models.entities import (
+    Activity,
+    Expense,
+    ExpenseSplit,
+    Group,
+    Membership,
+    RefreshToken,
+    Settlement,
+    User,
+)
 
 __all__ = [
     "Activity",
@@ -6,6 +15,7 @@ __all__ = [
     "ExpenseSplit",
     "Group",
     "Membership",
+    "RefreshToken",
     "Settlement",
     "User",
 ]
