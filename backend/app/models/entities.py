@@ -105,6 +105,10 @@ class Expense(Base):
     __tablename__ = "expenses"
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_expenses_amount_positive"),
+        CheckConstraint(
+            "split_type IN ('equal', 'custom')",
+            name="ck_expenses_split_type_valid",
+        ),
         Index("ix_expenses_group_expense_date", "group_id", "expense_date"),
     )
 
@@ -117,6 +121,9 @@ class Expense(Base):
     )
     description: Mapped[str] = mapped_column(String(500), nullable=False)
     amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    split_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="equal"
+    )
     paid_by: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
     )
