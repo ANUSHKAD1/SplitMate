@@ -5,6 +5,7 @@ from app.api.auth import router as auth_router
 from app.api.expenses import router as expenses_router
 from app.api.groups import router as groups_router
 from app.api.health import router as health_router
+from app.api.settlements import router as settlements_router
 
 
 app = FastAPI(title="SplitMate API")
@@ -21,3 +22,4 @@ app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(groups_router)
 app.include_router(expenses_router)
+app.include_router(settlements_router)
