@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Activity
+from app.realtime.events import emit_group_event
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,15 @@ def record_activity(
     )
     session.add(activity)
     return activity
+
+
+def publish_activity_added(activity: Activity) -> None:
+    """Emit a post-commit notification for an already-persisted activity row."""
+    emit_group_event(
+        activity.group_id,
+        "activity_added",
+        {"activity_id": activity.id, "event_type": activity.event_type},
+    )
 
 
 def list_group_activities(

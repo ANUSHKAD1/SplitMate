@@ -7,6 +7,7 @@ from app.api.expenses import router as expenses_router
 from app.api.groups import router as groups_router
 from app.api.health import router as health_router
 from app.api.settlements import router as settlements_router
+from app.api.websockets import router as websockets_router
 
 
 app = FastAPI(title="SplitMate API")
@@ -25,3 +26,4 @@ app.include_router(activities_router)
 app.include_router(groups_router)
 app.include_router(expenses_router)
 app.include_router(settlements_router)
+app.include_router(websockets_router)

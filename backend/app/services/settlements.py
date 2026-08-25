@@ -4,7 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Membership, Settlement
-from app.services.activities import record_activity
+from app.realtime.events import emit_financial_updates, emit_group_event
+from app.services.activities import publish_activity_added, record_activity
 from app.services.balances import calculate_group_balances
 
 
@@ -60,7 +61,7 @@ def create_settlement(
     )
     session.add(settlement)
     try:
-        record_activity(
+        activity = record_activity(
             session,
             group_id,
             from_user_id,
@@ -71,7 +72,11 @@ def create_settlement(
     except Exception:
         session.rollback()
         raise
-    return get_settlement(session, settlement.id)
+    result = get_settlement(session, settlement.id)
+    emit_group_event(group_id, "settlement_recorded", {"settlement_id": result.id})
+    publish_activity_added(activity)
+    emit_financial_updates(group_id)
+    return result
 
 
 def list_group_settlements(session: Session, group_id: int) -> list[Settlement]:

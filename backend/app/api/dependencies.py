@@ -25,28 +25,30 @@ def get_current_user(
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise _invalid_access_token_exception()
 
-    try:
-        payload = jwt.decode(
-            credentials.credentials,
-            settings.jwt_secret_key,
-            algorithms=[JWT_ALGORITHM],
-            options={"require": ["exp", "sub", "type"]},
-        )
-    except jwt.PyJWTError as error:
-        raise _invalid_access_token_exception() from error
-
-    if payload.get("type") != "access":
-        raise _invalid_access_token_exception()
-
-    user_id = _parse_user_id(payload)
-    if user_id is None:
-        raise _invalid_access_token_exception()
-
-    user = session.get(User, user_id)
+    user = get_user_from_access_token(session, credentials.credentials)
     if user is None:
         raise _invalid_access_token_exception()
 
     return user
+
+
+def get_user_from_access_token(session: Session, access_token: str | None) -> User | None:
+    """Resolve an access token with the same JWT validation used by HTTP requests."""
+    if not access_token:
+        return None
+    try:
+        payload = jwt.decode(
+            access_token,
+            settings.jwt_secret_key,
+            algorithms=[JWT_ALGORITHM],
+            options={"require": ["exp", "sub", "type"]},
+        )
+    except jwt.PyJWTError:
+        return None
+    if payload.get("type") != "access":
+        return None
+    user_id = _parse_user_id(payload)
+    return session.get(User, user_id) if user_id is not None else None
 
 
 def require_group_member(

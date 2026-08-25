@@ -5,7 +5,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Activity, Expense, ExpenseSplit, Group, Membership, Settlement, User
-from app.services.activities import record_activity
+from app.realtime.manager import connection_manager
+from app.services.activities import publish_activity_added, record_activity
 from app.services.balances import calculate_group_balances
 
 
@@ -129,7 +130,7 @@ def add_group_member(session: Session, group_id: int, owner_id: int, email: str)
     membership = Membership(group_id=group_id, user_id=user.id)
     session.add(membership)
     try:
-        record_activity(
+        activity = record_activity(
             session,
             group_id,
             owner_id,
@@ -142,6 +143,7 @@ def add_group_member(session: Session, group_id: int, owner_id: int, email: str)
         raise MemberAlreadyExistsError from error
 
     session.refresh(membership)
+    publish_activity_added(activity)
     return membership
 
 
@@ -169,7 +171,7 @@ def remove_group_member(
         raise MemberHasNonzeroBalanceError
 
     try:
-        record_activity(
+        activity = record_activity(
             session,
             group_id,
             owner_id,
@@ -181,6 +183,8 @@ def remove_group_member(
     except Exception:
         session.rollback()
         raise
+    connection_manager.remove_user_from_group(group_id, user_id)
+    publish_activity_added(activity)
 
 
 def get_group_member_net_balance(session: Session, group_id: int, user_id: int) -> int:

@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models import Expense, ExpenseSplit, Group, Membership
 from app.schemas.expenses import ExpenseSortField, ExpenseUpsertRequest, SortDirection, SplitType
-from app.services.activities import record_activity
+from app.realtime.events import emit_financial_updates, emit_group_event
+from app.services.activities import publish_activity_added, record_activity
 
 
 class ExpenseNotFoundError(Exception):
@@ -58,7 +59,7 @@ def create_expense(
             ExpenseSplit(expense_id=expense.id, user_id=user_id, amount=amount)
             for user_id, amount in split_rows
         )
-        record_activity(
+        activity = record_activity(
             session,
             group_id,
             creator_id,
@@ -70,7 +71,11 @@ def create_expense(
         session.rollback()
         raise
 
-    return get_expense(session, expense.id)
+    result = get_expense(session, expense.id)
+    emit_group_event(group_id, "expense_added", {"expense_id": result.id})
+    publish_activity_added(activity)
+    emit_financial_updates(group_id)
+    return result
 
 
 def list_group_expenses(
@@ -127,7 +132,7 @@ def update_expense(
             ExpenseSplit(expense_id=expense.id, user_id=user_id, amount=amount)
             for user_id, amount in split_rows
         )
-        record_activity(
+        activity = record_activity(
             session,
             expense.group_id,
             current_user_id,
@@ -139,7 +144,11 @@ def update_expense(
         session.rollback()
         raise
 
-    return get_expense(session, expense_id)
+    result = get_expense(session, expense_id)
+    emit_group_event(expense.group_id, "expense_edited", {"expense_id": result.id})
+    publish_activity_added(activity)
+    emit_financial_updates(expense.group_id)
+    return result
 
 
 def delete_expense(session: Session, expense_id: int, current_user_id: int) -> None:
@@ -151,7 +160,7 @@ def delete_expense(session: Session, expense_id: int, current_user_id: int) -> N
     try:
         session.execute(delete(ExpenseSplit).where(ExpenseSplit.expense_id == expense.id))
         session.execute(delete(Expense).where(Expense.id == expense.id))
-        record_activity(
+        activity = record_activity(
             session,
             expense.group_id,
             current_user_id,
@@ -162,6 +171,9 @@ def delete_expense(session: Session, expense_id: int, current_user_id: int) -> N
     except Exception:
         session.rollback()
         raise
+    emit_group_event(expense.group_id, "expense_deleted", {"expense_id": expense_id})
+    publish_activity_added(activity)
+    emit_financial_updates(expense.group_id)
 
 
 def get_expense(session: Session, expense_id: int) -> Expense:
