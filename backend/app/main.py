@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.activities import router as activities_router
 from app.api.auth import router as auth_router
 from app.api.expenses import router as expenses_router
 from app.api.groups import router as groups_router
@@ -20,6 +21,7 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(auth_router)
+app.include_router(activities_router)
 app.include_router(groups_router)
 app.include_router(expenses_router)
 app.include_router(settlements_router)

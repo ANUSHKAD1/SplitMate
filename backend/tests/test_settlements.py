@@ -10,7 +10,7 @@ from sqlalchemy import delete, select
 from app.core.security import create_access_token
 from app.db.session import SessionLocal
 from app.main import app
-from app.models import Expense, ExpenseSplit, Group, Membership, Settlement, User
+from app.models import Activity, Expense, ExpenseSplit, Group, Membership, Settlement, User
 from app.services.balances import calculate_group_balances
 
 
@@ -54,6 +54,7 @@ def user_factory() -> Callable[[str], SettlementUser]:
             session.execute(delete(ExpenseSplit).where(ExpenseSplit.expense_id.in_(expense_ids)))
             session.execute(delete(Expense).where(Expense.group_id.in_(group_ids)))
             session.execute(delete(Settlement).where(Settlement.group_id.in_(group_ids)))
+            session.execute(delete(Activity).where(Activity.group_id.in_(group_ids)))
             session.execute(delete(Membership).where(Membership.group_id.in_(group_ids)))
             session.execute(delete(Group).where(Group.id.in_(group_ids)))
         if created_user_ids:

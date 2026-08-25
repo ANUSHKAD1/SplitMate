@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Membership, Settlement
+from app.services.activities import record_activity
 from app.services.balances import calculate_group_balances
 
 
@@ -59,6 +60,13 @@ def create_settlement(
     )
     session.add(settlement)
     try:
+        record_activity(
+            session,
+            group_id,
+            from_user_id,
+            "settlement_recorded",
+            f"Settlement of {amount} was recorded",
+        )
         session.commit()
     except Exception:
         session.rollback()

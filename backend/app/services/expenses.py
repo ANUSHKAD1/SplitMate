@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models import Expense, ExpenseSplit, Group, Membership
 from app.schemas.expenses import ExpenseSortField, ExpenseUpsertRequest, SortDirection, SplitType
+from app.services.activities import record_activity
 
 
 class ExpenseNotFoundError(Exception):
@@ -56,6 +57,13 @@ def create_expense(
         session.add_all(
             ExpenseSplit(expense_id=expense.id, user_id=user_id, amount=amount)
             for user_id, amount in split_rows
+        )
+        record_activity(
+            session,
+            group_id,
+            creator_id,
+            "expense_added",
+            f'Expense "{expense.description}" was added',
         )
         session.commit()
     except Exception:
@@ -119,6 +127,13 @@ def update_expense(
             ExpenseSplit(expense_id=expense.id, user_id=user_id, amount=amount)
             for user_id, amount in split_rows
         )
+        record_activity(
+            session,
+            expense.group_id,
+            current_user_id,
+            "expense_edited",
+            f'Expense "{expense.description}" was edited',
+        )
         session.commit()
     except Exception:
         session.rollback()
@@ -131,10 +146,18 @@ def delete_expense(session: Session, expense_id: int, current_user_id: int) -> N
     """Delete an authorized expense and its split rows without touching users."""
     expense = _get_expense_for_member(session, expense_id, current_user_id)
     _require_expense_mutation_permission(session, expense, current_user_id)
+    message = f'Expense "{expense.description}" was deleted'
 
     try:
         session.execute(delete(ExpenseSplit).where(ExpenseSplit.expense_id == expense.id))
         session.execute(delete(Expense).where(Expense.id == expense.id))
+        record_activity(
+            session,
+            expense.group_id,
+            current_user_id,
+            "expense_deleted",
+            message,
+        )
         session.commit()
     except Exception:
         session.rollback()

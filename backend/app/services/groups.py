@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Activity, Expense, ExpenseSplit, Group, Membership, Settlement, User
+from app.services.activities import record_activity
 from app.services.balances import calculate_group_balances
 
 
@@ -128,6 +129,13 @@ def add_group_member(session: Session, group_id: int, owner_id: int, email: str)
     membership = Membership(group_id=group_id, user_id=user.id)
     session.add(membership)
     try:
+        record_activity(
+            session,
+            group_id,
+            owner_id,
+            "member_added",
+            f"{user.name} was added to the group",
+        )
         session.commit()
     except IntegrityError as error:
         session.rollback()
@@ -161,6 +169,13 @@ def remove_group_member(
         raise MemberHasNonzeroBalanceError
 
     try:
+        record_activity(
+            session,
+            group_id,
+            owner_id,
+            "member_removed",
+            f"{membership.user.name} was removed from the group",
+        )
         session.delete(membership)
         session.commit()
     except Exception:
