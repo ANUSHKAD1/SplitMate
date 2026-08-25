@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Activity, Expense, ExpenseSplit, Group, Membership, Settlement, User
+from app.services.balances import calculate_group_balances
 
 
 class GroupNotFoundError(Exception):
@@ -168,39 +169,8 @@ def remove_group_member(
 
 
 def get_group_member_net_balance(session: Session, group_id: int, user_id: int) -> int:
-    """Return a member's net position from persisted group financial records.
-
-    Positive values mean the group owes the member; negative values mean the member
-    owes the group. The calculation uses persisted expense payments, assigned splits,
-    and settlement transfers rather than inventing a temporary balance model.
-    """
-    paid = session.scalar(
-        select(func.coalesce(func.sum(Expense.amount), 0)).where(
-            Expense.group_id == group_id,
-            Expense.paid_by == user_id,
-        )
-    )
-    owed = session.scalar(
-        select(func.coalesce(func.sum(ExpenseSplit.amount), 0))
-        .join(Expense, Expense.id == ExpenseSplit.expense_id)
-        .where(
-            Expense.group_id == group_id,
-            ExpenseSplit.user_id == user_id,
-        )
-    )
-    sent = session.scalar(
-        select(func.coalesce(func.sum(Settlement.amount), 0)).where(
-            Settlement.group_id == group_id,
-            Settlement.from_user_id == user_id,
-        )
-    )
-    received = session.scalar(
-        select(func.coalesce(func.sum(Settlement.amount), 0)).where(
-            Settlement.group_id == group_id,
-            Settlement.to_user_id == user_id,
-        )
-    )
-    return int(paid or 0) - int(owed or 0) + int(sent or 0) - int(received or 0)
+    """Return a member balance from the canonical, read-only balance engine."""
+    return calculate_group_balances(session, group_id).balance_for(user_id)
 
 
 def _get_owned_group(session: Session, group_id: int, owner_id: int) -> Group:
