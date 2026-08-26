@@ -11,6 +11,7 @@ from app.schemas.settlements import (
     SettlementResponse,
     SettlementUserResponse,
 )
+from app.schemas.money import paise_to_rupees
 from app.services.settlements import (
     SettlementValidationError,
     create_settlement,
@@ -32,13 +33,14 @@ def create_settlement_endpoint(
     current_user: Annotated[User, Depends(require_group_member)],
     session: Annotated[Session, Depends(get_db_session)],
 ) -> SettlementResponse:
+    settlement_data = request.to_paise()
     try:
         settlement = create_settlement(
             session,
             group_id,
             current_user.id,
-            request.to_user_id,
-            request.amount,
+            settlement_data.to_user_id,
+            settlement_data.amount,
         )
     except SettlementValidationError as error:
         raise HTTPException(
@@ -75,6 +77,6 @@ def _settlement_response(settlement: Settlement) -> SettlementResponse:
             name=settlement.to_user.name,
             email=settlement.to_user.email,
         ),
-        amount=settlement.amount,
+        amount=paise_to_rupees(settlement.amount),
         created_at=settlement.created_at,
     )

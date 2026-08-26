@@ -85,7 +85,7 @@ def add_member(owner: SettlementUser, group_id: int, member: SettlementUser) -> 
 
 
 def create_debt(
-    group_id: int, creditor_id: int, debtor_id: int, amount: int = 100
+    group_id: int, creditor_id: int, debtor_id: int, amount: int = 10_000
 ) -> None:
     with SessionLocal() as session:
         expense = Expense(
@@ -103,7 +103,7 @@ def create_debt(
 
 
 def settle(
-    payer: SettlementUser, group_id: int, recipient_id: int, amount: int
+    payer: SettlementUser, group_id: int, recipient_id: int, amount: int | str | float
 ):
     return client.post(
         f"/groups/{group_id}/settlements",
@@ -126,12 +126,44 @@ def test_valid_settlement_succeeds_and_changes_canonical_balances(
     assert response.status_code == 201
     assert response.json()["from_user"]["id"] == debtor.id
     assert response.json()["to_user"]["id"] == creditor.id
-    assert response.json()["amount"] == 60
+    assert response.json()["amount"] == "60.00"
     with SessionLocal() as session:
         balances = calculate_group_balances(session, group_id)
-    assert balances.balance_for(creditor.id) == 40
-    assert balances.balance_for(debtor.id) == -40
+        settlement = session.scalar(
+            select(Settlement).where(Settlement.group_id == group_id)
+        )
+    assert settlement is not None
+    assert settlement.amount == 6_000
+    assert balances.balance_for(creditor.id) == 4_000
+    assert balances.balance_for(debtor.id) == -4_000
 
+
+@pytest.mark.parametrize(
+    ("amount", "expected_paise", "expected_response"),
+    [(250, 25_000, "250.00"), ("250.50", 25_050, "250.50")],
+)
+def test_settlement_converts_rupees_to_paise_and_formats_the_response(
+    user_factory: Callable[[str], SettlementUser],
+    amount: int | str,
+    expected_paise: int,
+    expected_response: str,
+) -> None:
+    creditor = user_factory("Creditor")
+    debtor = user_factory("Debtor")
+    group_id = create_group(creditor)
+    add_member(creditor, group_id, debtor)
+    create_debt(group_id, creditor.id, debtor.id, amount=30_000)
+
+    response = settle(debtor, group_id, creditor.id, amount)
+
+    assert response.status_code == 201
+    assert response.json()["amount"] == expected_response
+    with SessionLocal() as session:
+        settlement = session.scalar(
+            select(Settlement).where(Settlement.group_id == group_id)
+        )
+    assert settlement is not None
+    assert settlement.amount == expected_paise
 
 @pytest.mark.parametrize("amount", [0, -1])
 def test_settlement_amount_must_be_positive(
@@ -148,7 +180,22 @@ def test_settlement_amount_must_be_positive(
     assert response.status_code == 422
 
 
+@pytest.mark.parametrize("amount", [1.0, "1.001", "250.505"])
+def test_settlement_amount_rejects_floats_and_more_than_two_decimal_places(
+    user_factory: Callable[[str], SettlementUser], amount: float | str
+) -> None:
+    creditor = user_factory("Creditor")
+    debtor = user_factory("Debtor")
+    group_id = create_group(creditor)
+    add_member(creditor, group_id, debtor)
+    create_debt(group_id, creditor.id, debtor.id)
+
+    response = settle(debtor, group_id, creditor.id, amount)
+
+    assert response.status_code == 422
 def test_settlement_users_must_be_different(
+
+
     user_factory: Callable[[str], SettlementUser],
 ) -> None:
     owner = user_factory("Owner")
@@ -268,5 +315,5 @@ def test_settlement_list_is_group_scoped_and_newest_first(
     )
 
     assert response.status_code == 200
-    assert [item["amount"] for item in response.json()] == [30, 40]
+    assert [item["amount"] for item in response.json()] == ["30.00", "40.00"]
     assert {item["group_id"] for item in response.json()} == {first_group_id}
