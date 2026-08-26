@@ -129,9 +129,9 @@ def create_expense(
     return response.json()
 
 
-def split_amounts(expense: dict[str, object]) -> dict[int, int]:
+def split_amounts(expense: dict[str, object]) -> dict[int, str]:
     return {
-        int(split["user_id"]): int(split["amount"])
+        int(split["user_id"]): str(split["amount"])
         for split in expense["splits"]  # type: ignore[index]
     }
 
@@ -147,7 +147,8 @@ def test_create_equal_split(user_factory: Callable[[str], ExpenseUser]) -> None:
     )
 
     assert expense["split_type"] == "equal"
-    assert split_amounts(expense) == {owner.id: 50, member.id: 50}
+    assert expense["amount"] == "100.00"
+    assert split_amounts(expense) == {owner.id: "50.00", member.id: "50.00"}
 
 
 def test_uneven_equal_split_assigns_remainder_in_request_order(
@@ -166,16 +167,16 @@ def test_uneven_equal_split_assigns_remainder_in_request_order(
         equal_payload(
             owner.id,
             [first_member.id, second_member.id, owner.id],
-            amount=100,
+            amount=1,
         ),
     )
 
     assert split_amounts(expense) == {
-        first_member.id: 34,
-        second_member.id: 33,
-        owner.id: 33,
+        first_member.id: "0.34",
+        second_member.id: "0.33",
+        owner.id: "0.33",
     }
-    assert sum(split_amounts(expense).values()) == 100
+    assert expense["amount"] == "1.00"
 
 
 def test_create_exact_custom_split(user_factory: Callable[[str], ExpenseUser]) -> None:
@@ -194,7 +195,92 @@ def test_create_exact_custom_split(user_factory: Callable[[str], ExpenseUser]) -
     )
 
     assert expense["split_type"] == "custom"
-    assert split_amounts(expense) == {owner.id: 25, member.id: 75}
+    assert split_amounts(expense) == {owner.id: "25.00", member.id: "75.00"}
+
+
+@pytest.mark.parametrize(
+    ("amount", "expected_paise", "expected_response"),
+    [("250", 25_000, "250.00"), ("250.50", 25_050, "250.50")],
+)
+def test_expense_request_rupees_are_stored_as_paise_and_rendered_as_rupees(
+    user_factory: Callable[[str], ExpenseUser],
+    amount: str,
+    expected_paise: int,
+    expected_response: str,
+) -> None:
+    owner = user_factory()
+    group_id = create_group(owner)
+
+    expense = create_expense(
+        owner,
+        group_id,
+        equal_payload(owner.id, [owner.id], amount=amount),  # type: ignore[arg-type]
+    )
+
+    assert expense["amount"] == expected_response
+    assert split_amounts(expense) == {owner.id: expected_response}
+    with SessionLocal() as session:
+        stored_expense = session.get(Expense, expense["id"])
+        stored_split = session.scalar(
+            select(ExpenseSplit).where(ExpenseSplit.expense_id == expense["id"])
+        )
+    assert stored_expense is not None
+    assert stored_expense.amount == expected_paise
+    assert stored_split is not None
+    assert stored_split.amount == expected_paise
+
+
+def test_custom_rupee_split_is_stored_in_paise_and_renders_fixed_scale(
+    user_factory: Callable[[str], ExpenseUser],
+) -> None:
+    owner = user_factory()
+    member = user_factory("Member")
+    group_id = create_group(owner)
+    add_member(owner, group_id, member)
+
+    expense = create_expense(
+        owner,
+        group_id,
+        custom_payload(
+            owner.id,
+            [
+                {"user_id": owner.id, "amount": "125.25"},
+                {"user_id": member.id, "amount": "125.25"},
+            ],
+            amount="250.50",  # type: ignore[arg-type]
+        ),
+    )
+
+    assert expense["amount"] == "250.50"
+    assert split_amounts(expense) == {
+        owner.id: "125.25",
+        member.id: "125.25",
+    }
+    with SessionLocal() as session:
+        stored_expense = session.get(Expense, expense["id"])
+        stored_splits = list(
+            session.scalars(
+                select(ExpenseSplit).where(ExpenseSplit.expense_id == expense["id"])
+            )
+        )
+    assert stored_expense is not None
+    assert stored_expense.amount == 25_050
+    assert {split.amount for split in stored_splits} == {12_525}
+
+
+def test_expense_amount_with_more_than_two_decimals_is_rejected(
+    user_factory: Callable[[str], ExpenseUser],
+) -> None:
+    owner = user_factory()
+    group_id = create_group(owner)
+
+    response = client.post(
+        f"/groups/{group_id}/expenses",
+        json=equal_payload(owner.id, [owner.id], amount="250.501"),  # type: ignore[arg-type]
+        headers=auth_headers(owner),
+    )
+
+    assert response.status_code == 422
 
 
 def test_custom_split_total_mismatch_is_rejected(
@@ -352,7 +438,10 @@ def test_edit_replaces_split_rows_safely(user_factory: Callable[[str], ExpenseUs
 
     assert response.status_code == 200
     assert response.json()["description"] == "Updated lunch"
-    assert split_amounts(response.json()) == {owner.id: 20, second_member.id: 80}
+    assert split_amounts(response.json()) == {
+        owner.id: "20.00",
+        second_member.id: "80.00",
+    }
     with SessionLocal() as session:
         split_user_ids = set(
             session.scalars(

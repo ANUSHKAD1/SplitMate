@@ -1,8 +1,12 @@
+from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+from app.schemas.money import parse_rupee_amount, rupees_to_paise
 
 
 class SplitType(StrEnum):
@@ -10,14 +14,43 @@ class SplitType(StrEnum):
     CUSTOM = "custom"
 
 
+@dataclass(frozen=True)
+class CustomSplitData:
+    """Internal expense split input, expressed in integer paise."""
+
+    user_id: int
+    amount: int
+
+
+@dataclass(frozen=True)
+class ExpenseUpsertData:
+    """Internal expense input passed to the domain service in integer paise."""
+
+    description: str
+    amount: int
+    paid_by: int
+    expense_date: date
+    split_type: SplitType
+    split_user_ids: list[int]
+    splits: list[CustomSplitData]
+
+
 class CustomSplitRequest(BaseModel):
     user_id: int = Field(gt=0, strict=True)
-    amount: int = Field(ge=0, strict=True)
+    amount: Decimal
+
+    @field_validator("amount", mode="before")
+    @classmethod
+    def validate_amount(cls, value: object) -> Decimal:
+        amount = parse_rupee_amount(value)
+        if amount < 0:
+            raise ValueError("Split amounts cannot be negative")
+        return amount
 
 
 class ExpenseUpsertRequest(BaseModel):
     description: str = Field(min_length=1, max_length=500)
-    amount: int = Field(gt=0, strict=True)
+    amount: Decimal
     paid_by: int = Field(gt=0, strict=True)
     expense_date: date
     split_type: SplitType
@@ -30,6 +63,14 @@ class ExpenseUpsertRequest(BaseModel):
         if isinstance(value, str):
             return value.strip()
         return value
+
+    @field_validator("amount", mode="before")
+    @classmethod
+    def validate_amount(cls, value: object) -> Decimal:
+        amount = parse_rupee_amount(value)
+        if amount <= 0:
+            raise ValueError("Expense amount must be positive")
+        return amount
 
     @field_validator("split_user_ids")
     @classmethod
@@ -60,10 +101,28 @@ class ExpenseUpsertRequest(BaseModel):
                 raise ValueError("A user may appear only once in a custom split")
         return self
 
+    def to_paise(self) -> ExpenseUpsertData:
+        """Convert public rupee inputs to the service's integer-paise contract."""
+        return ExpenseUpsertData(
+            description=self.description,
+            amount=rupees_to_paise(self.amount),
+            paid_by=self.paid_by,
+            expense_date=self.expense_date,
+            split_type=self.split_type,
+            split_user_ids=self.split_user_ids,
+            splits=[
+                CustomSplitData(
+                    user_id=split.user_id,
+                    amount=rupees_to_paise(split.amount),
+                )
+                for split in self.splits
+            ],
+        )
+
 
 class ExpenseSplitResponse(BaseModel):
     user_id: int
-    amount: int
+    amount: str
 
 
 class ExpenseResponse(BaseModel):
@@ -71,7 +130,7 @@ class ExpenseResponse(BaseModel):
     group_id: int
     created_by: int
     description: str
-    amount: int
+    amount: str
     paid_by: int
     expense_date: date
     split_type: SplitType

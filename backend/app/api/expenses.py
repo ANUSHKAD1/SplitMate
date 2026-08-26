@@ -15,6 +15,7 @@ from app.schemas.expenses import (
     SortDirection,
     SplitType,
 )
+from app.schemas.money import paise_to_rupees
 from app.services.expenses import (
     ExpenseGroupMembershipRequiredError,
     ExpenseMutationForbiddenError,
@@ -42,7 +43,7 @@ def create_expense_endpoint(
     session: Annotated[Session, Depends(get_db_session)],
 ) -> ExpenseResponse:
     try:
-        expense = create_expense(session, group_id, current_user.id, request)
+        expense = create_expense(session, group_id, current_user.id, request.to_paise())
     except ExpenseGroupMembershipRequiredError as error:
         raise _membership_error(error) from error
     except ExpenseValidationError as error:
@@ -87,7 +88,7 @@ def update_expense_endpoint(
     session: Annotated[Session, Depends(get_db_session)],
 ) -> ExpenseResponse:
     try:
-        expense = update_expense(session, expense_id, current_user.id, request)
+        expense = update_expense(session, expense_id, current_user.id, request.to_paise())
     except ExpenseNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -134,14 +135,17 @@ def _expense_response(expense: Expense) -> ExpenseResponse:
         group_id=expense.group_id,
         created_by=expense.created_by,
         description=expense.description,
-        amount=expense.amount,
+        amount=paise_to_rupees(expense.amount),
         paid_by=expense.paid_by,
         expense_date=expense.expense_date,
         split_type=SplitType(expense.split_type),
         created_at=expense.created_at,
         updated_at=expense.updated_at,
         splits=[
-            ExpenseSplitResponse(user_id=split.user_id, amount=split.amount)
+            ExpenseSplitResponse(
+                user_id=split.user_id,
+                amount=paise_to_rupees(split.amount),
+            )
             for split in sorted(expense.splits, key=lambda split: split.user_id)
         ],
     )

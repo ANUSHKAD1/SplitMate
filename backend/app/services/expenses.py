@@ -4,7 +4,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import Expense, ExpenseSplit, Group, Membership
-from app.schemas.expenses import ExpenseSortField, ExpenseUpsertRequest, SortDirection, SplitType
+from app.schemas.expenses import ExpenseSortField, ExpenseUpsertData, SortDirection, SplitType
 from app.realtime.events import emit_financial_updates, emit_group_event
 from app.services.activities import publish_activity_added, record_activity
 
@@ -37,7 +37,7 @@ def create_expense(
     session: Session,
     group_id: int,
     creator_id: int,
-    data: ExpenseUpsertRequest,
+    data: ExpenseUpsertData,
 ) -> Expense:
     """Persist a validated expense and all of its split rows together."""
     _require_group_membership(session, group_id, creator_id)
@@ -114,7 +114,7 @@ def update_expense(
     session: Session,
     expense_id: int,
     current_user_id: int,
-    data: ExpenseUpsertRequest,
+    data: ExpenseUpsertData,
 ) -> Expense:
     """Replace an authorized expense and all split rows atomically."""
     expense = _get_expense_for_member(session, expense_id, current_user_id)
@@ -224,7 +224,7 @@ def _require_expense_mutation_permission(
 def _build_split_rows(
     session: Session,
     group_id: int,
-    data: ExpenseUpsertRequest,
+    data: ExpenseUpsertData,
 ) -> list[tuple[int, int]]:
     _validate_payer_membership(session, group_id, data.paid_by)
 
