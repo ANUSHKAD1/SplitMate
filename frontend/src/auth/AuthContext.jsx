@@ -7,6 +7,7 @@ import {
   restoreSession,
   setAuthFailureHandler,
   setAuthTokens,
+  subscribeToAccessToken,
 } from '../api/client'
 
 const AuthContext = createContext(null)
@@ -22,6 +23,8 @@ export function AuthProvider({ children }) {
     setAccessToken(null)
     setUser(null)
   }, [])
+
+  useEffect(() => subscribeToAccessToken(setAccessToken), [])
 
   useEffect(() => {
     setAuthFailureHandler(() => {

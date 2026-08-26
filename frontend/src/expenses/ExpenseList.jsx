@@ -5,7 +5,7 @@ import { expensesApi } from './expensesApi'
 
 const pageSize = 10
 
-export default function ExpenseList({ groupId, group, currentUserId, onEdit, onDataChanged }) {
+export default function ExpenseList({ groupId, group, currentUserId, onEdit, onDataChanged, refreshKey }) {
   const [data, setData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -25,7 +25,7 @@ export default function ExpenseList({ groupId, group, currentUserId, onEdit, onD
       setError(getApiErrorMessage(requestError, 'Unable to load expenses. Please try again.'))
     } finally { setIsLoading(false) }
   }, [groupId, page, sortBy, sortOrder])
-  useEffect(() => { loadExpenses() }, [loadExpenses])
+  useEffect(() => { loadExpenses() }, [loadExpenses, refreshKey])
 
   function changeSort(field) {
     if (field === sortBy) setSortOrder((current) => current === 'asc' ? 'desc' : 'asc')

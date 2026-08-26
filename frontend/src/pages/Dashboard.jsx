@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { getApiErrorMessage } from '../api/auth'
 import PageShell from '../components/PageShell'
 import DashboardStat from '../dashboard/DashboardStat'
-import { getDashboard } from '../dashboard/dashboardApi'
+import { refreshDashboard, subscribeToDashboard } from '../dashboard/dashboardApi'
 import RecentActivityList from '../dashboard/RecentActivityList'
 import { formatIndianRupees } from '../utils/currency'
 
@@ -23,14 +23,19 @@ export default function Dashboard() {
     setError('')
 
     try {
-      const response = await getDashboard()
-      setDashboard(response.data)
+      setDashboard(await refreshDashboard())
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, 'Unable to load your dashboard. Please try again.'))
     } finally {
       setIsLoading(false)
     }
   }, [])
+
+  useEffect(() => subscribeToDashboard((nextDashboard) => {
+    setDashboard(nextDashboard)
+    setError('')
+    setIsLoading(false)
+  }), [])
 
   useEffect(() => {
     loadDashboard()

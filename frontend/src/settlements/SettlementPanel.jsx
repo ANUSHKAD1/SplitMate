@@ -7,7 +7,7 @@ function formatDate(dateTime) {
   return new Date(dateTime).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-export default function SettlementPanel({ groupId, currentUserId, onSettlementRecorded }) {
+export default function SettlementPanel({ groupId, currentUserId, onSettlementRecorded, refreshKey }) {
   const [balances, setBalances] = useState(null)
   const [settlements, setSettlements] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -37,7 +37,7 @@ export default function SettlementPanel({ groupId, currentUserId, onSettlementRe
     }
   }, [groupId])
 
-  useEffect(() => { loadSettlementData() }, [loadSettlementData])
+  useEffect(() => { loadSettlementData() }, [loadSettlementData, refreshKey])
 
   const actionableDebts = useMemo(
     () => balances?.debts.filter((debt) => debt.from_user_id === currentUserId) || [],

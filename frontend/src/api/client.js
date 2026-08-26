@@ -6,6 +6,11 @@ const REFRESH_TOKEN_KEY = 'splitmate_refresh_token'
 let accessToken = null
 let refreshPromise = null
 let authFailureHandler = () => window.location.assign('/login')
+const accessTokenListeners = new Set()
+
+function notifyAccessTokenListeners() {
+  accessTokenListeners.forEach((listener) => listener(accessToken))
+}
 
 function isAuthEndpoint(url = '') {
   const pathname = String(url).split('?')[0]
@@ -20,6 +25,11 @@ export function getAccessToken() {
   return accessToken
 }
 
+export function subscribeToAccessToken(listener) {
+  accessTokenListeners.add(listener)
+  return () => accessTokenListeners.delete(listener)
+}
+
 export function setAuthTokens(tokens) {
   const { access_token: nextAccessToken, refresh_token: nextRefreshToken } = tokens
   if (!nextAccessToken || !nextRefreshToken) {
@@ -29,11 +39,13 @@ export function setAuthTokens(tokens) {
   // Store the rotated refresh token before exposing its matching access token.
   sessionStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken)
   accessToken = nextAccessToken
+  notifyAccessTokenListeners()
 }
 
 export function clearAuthTokens() {
   accessToken = null
   sessionStorage.removeItem(REFRESH_TOKEN_KEY)
+  notifyAccessTokenListeners()
 }
 
 export function setAuthFailureHandler(handler) {
