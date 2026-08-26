@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { getApiErrorMessage } from '../api/auth'
 import PageShell from '../components/PageShell'
 import DashboardStat from '../dashboard/DashboardStat'
@@ -49,6 +50,7 @@ export default function Dashboard() {
   const largestDebt = dashboard.group_where_user_owes_most
 
   return <PageShell title="Dashboard">
+    <Link to="/groups" className="mb-5 inline-block text-sm font-medium text-slate-900 underline">View your groups</Link>
     <div className="grid gap-4 sm:grid-cols-2">
       <DashboardStat label="You owe" value={formatIndianRupees(dashboard.total_user_owes)} tone="negative" />
       <DashboardStat label="Owed to you" value={formatIndianRupees(dashboard.total_owed_to_user)} tone="positive" />
