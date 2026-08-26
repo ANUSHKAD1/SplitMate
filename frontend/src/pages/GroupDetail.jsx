@@ -9,6 +9,7 @@ import ExpenseList from '../expenses/ExpenseList'
 import { expensesApi } from '../expenses/expensesApi'
 import MemberManagement from '../groups/MemberManagement'
 import { groupsApi } from '../groups/groupsApi'
+import SettlementPanel from '../settlements/SettlementPanel'
 import { getTokenSubject } from '../utils/token'
 
 export default function GroupDetail() {
@@ -22,6 +23,7 @@ export default function GroupDetail() {
   const [expenseError, setExpenseError] = useState('')
   const [isSavingExpense, setIsSavingExpense] = useState(false)
   const [financialRefreshKey, setFinancialRefreshKey] = useState(0)
+  const [settlementRefreshKey, setSettlementRefreshKey] = useState(0)
   const currentUserId = useMemo(() => getTokenSubject(accessToken), [accessToken])
 
   const loadGroup = useCallback(async () => {
@@ -64,6 +66,7 @@ export default function GroupDetail() {
     setIsExpenseFormOpen(false); setEditingExpense(null); setExpenseError('')
   }
   function refreshFinancialData() { setFinancialRefreshKey((current) => current + 1) }
+  function refreshSettlementBalances() { setSettlementRefreshKey((current) => current + 1) }
 
   return <PageShell title={group.name}>
     <div className="flex flex-wrap items-center justify-between gap-3"><Link to="/groups" className="text-sm text-slate-700 underline">Back to groups</Link><button onClick={openAddExpense} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">Add expense</button></div>
@@ -75,6 +78,7 @@ export default function GroupDetail() {
       {isOwner ? <MemberManagement group={group} onGroupChanged={loadGroup} /> : <ul className="mt-4 divide-y divide-slate-200">{group.members.map((member) => <li key={member.id} className="py-3"><p className="text-sm font-medium">{member.name}{member.id === group.owner_id && <span className="ml-2 text-xs text-slate-500">Owner</span>}</p><p className="text-sm text-slate-600">{member.email}</p></li>)}</ul>}
     </section>
     <ExpenseList key={financialRefreshKey} groupId={group.id} group={group} currentUserId={currentUserId} onEdit={openEditExpense} onDataChanged={refreshFinancialData} />
-    <Balances groupId={group.id} refreshKey={financialRefreshKey} />
+    <Balances groupId={group.id} refreshKey={`${financialRefreshKey}-${settlementRefreshKey}`} />
+    <SettlementPanel groupId={group.id} currentUserId={currentUserId} onSettlementRecorded={refreshSettlementBalances} />
   </PageShell>
 }
