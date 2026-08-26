@@ -11,6 +11,7 @@ from app.core.security import create_access_token
 from app.db.session import SessionLocal, engine
 from app.main import app
 from app.models import Expense, ExpenseSplit, Group, Membership, Settlement, User
+from app.schemas.money import paise_to_rupees
 from app.services.balances import calculate_group_balances
 
 
@@ -127,23 +128,36 @@ def test_group_member_receives_canonical_balances_and_debt_suggestions(
     add_expense(
         group_id,
         first_creditor.id,
-        100,
-        {first_debtor.id: 60, second_debtor.id: 40},
+        25_000,
+        {first_debtor.id: 25_000},
     )
     add_expense(
         group_id,
         second_creditor.id,
-        30,
-        {first_creditor.id: 30},
+        25_050,
+        {second_debtor.id: 25_050},
     )
 
     with SessionLocal() as session:
         canonical = calculate_group_balances(session, group_id)
 
+    assert {balance.user_id: balance.net_balance for balance in canonical.member_balances} == {
+        first_creditor.id: 25_000,
+        second_creditor.id: 25_050,
+        first_debtor.id: -25_000,
+        second_debtor.id: -25_050,
+    }
     response = get_balances(first_creditor, group_id)
 
     assert response.status_code == 200
     body = response.json()
+    balances_by_user = {item["user_id"]: item["net_balance"] for item in body["balances"]}
+    assert balances_by_user[first_creditor.id] == "250.00"
+    assert balances_by_user[first_debtor.id] == "-250.00"
+    assert balances_by_user[second_creditor.id] == "250.50"
+    assert balances_by_user[second_debtor.id] == "-250.50"
+    assert [debt["amount"] for debt in body["debts"]] == ["250.00", "250.50"]
+
     names = {
         user.id: user.name
         for user in [first_creditor, second_creditor, first_debtor, second_debtor]
@@ -152,7 +166,7 @@ def test_group_member_receives_canonical_balances_and_debt_suggestions(
         {
             "user_id": balance.user_id,
             "name": names[balance.user_id],
-            "net_balance": balance.net_balance,
+            "net_balance": paise_to_rupees(balance.net_balance),
         }
         for balance in canonical.member_balances
     ]
@@ -162,7 +176,7 @@ def test_group_member_receives_canonical_balances_and_debt_suggestions(
             "from_user_name": names[payment.from_user_id],
             "to_user_id": payment.to_user_id,
             "to_user_name": names[payment.to_user_id],
-            "amount": payment.amount,
+            "amount": paise_to_rupees(payment.amount),
         }
         for payment in canonical.suggested_payments
     ]

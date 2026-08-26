@@ -12,6 +12,7 @@ from app.schemas.balances import (
     GroupBalancesResponse,
     MemberBalanceResponse,
 )
+from app.schemas.money import paise_to_rupees
 from app.services.balances import calculate_group_balances
 
 
@@ -42,7 +43,7 @@ def get_group_balances(
             MemberBalanceResponse(
                 user_id=balance.user_id,
                 name=user_names[balance.user_id],
-                net_balance=balance.net_balance,
+                net_balance=paise_to_rupees(balance.net_balance),
             )
             for balance in result.member_balances
         ],
@@ -52,7 +53,7 @@ def get_group_balances(
                 from_user_name=user_names[debt.from_user_id],
                 to_user_id=debt.to_user_id,
                 to_user_name=user_names[debt.to_user_id],
-                amount=debt.amount,
+                amount=paise_to_rupees(debt.amount),
             )
             for debt in result.suggested_payments
         ],

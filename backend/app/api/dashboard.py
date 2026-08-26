@@ -11,6 +11,7 @@ from app.schemas.dashboard import (
     DashboardRecentActivityResponse,
     DashboardResponse,
 )
+from app.schemas.money import paise_to_rupees
 from app.services.dashboard import DashboardResult, get_dashboard
 
 
@@ -31,15 +32,15 @@ def get_dashboard_endpoint(
 def _dashboard_response(result: DashboardResult) -> DashboardResponse:
     debt_group = result.group_where_user_owes_most
     return DashboardResponse(
-        total_owed_to_user=result.total_owed_to_user,
-        total_user_owes=result.total_user_owes,
-        net_balance=result.net_balance,
+        total_owed_to_user=paise_to_rupees(result.total_owed_to_user),
+        total_user_owes=paise_to_rupees(result.total_user_owes),
+        net_balance=paise_to_rupees(result.net_balance),
         group_count=result.group_count,
         group_where_user_owes_most=(
             DashboardDebtGroupResponse(
                 group_id=debt_group.group_id,
                 group_name=debt_group.group_name,
-                amount_owed=debt_group.amount_owed,
+                amount_owed=paise_to_rupees(debt_group.amount_owed),
             )
             if debt_group is not None
             else None

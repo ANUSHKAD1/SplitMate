@@ -11,6 +11,7 @@ from app.core.security import create_access_token
 from app.db.session import SessionLocal
 from app.main import app
 from app.models import Activity, Expense, ExpenseSplit, Group, Membership, Settlement, User
+from app.services.dashboard import get_dashboard
 
 
 client = TestClient(app)
@@ -126,24 +127,30 @@ def test_dashboard_is_authenticated_and_reconciles_multiple_group_balances(
             session, unrelated_user.id, [unrelated_user.id], "Private"
         )
         group_ids.extend([positive_group, negative_group, zero_group, unrelated_group])
-        add_expense(session, positive_group, dashboard_user.id, {other_user.id: 100})
-        add_expense(session, negative_group, other_user.id, {dashboard_user.id: 250})
+        add_expense(session, positive_group, dashboard_user.id, {other_user.id: 25_050})
+        add_expense(session, negative_group, other_user.id, {dashboard_user.id: 25_000})
         add_expense(session, zero_group, dashboard_user.id, {dashboard_user.id: 20})
         add_expense(session, unrelated_group, unrelated_user.id, {unrelated_user.id: 999})
 
+    with SessionLocal() as session:
+        dashboard_result = get_dashboard(session, dashboard_user.id, 1, 10)
+    assert (
+        dashboard_result.total_owed_to_user,
+        dashboard_result.total_user_owes,
+        dashboard_result.net_balance,
+    ) == (25_050, 25_000, 50)
     response = client.get("/dashboard", headers=headers(dashboard_user))
 
     assert response.status_code == 200
     body = response.json()
-    assert body["total_owed_to_user"] == 100
-    assert body["total_user_owes"] == 250
-    assert body["net_balance"] == -150
-    assert body["net_balance"] == body["total_owed_to_user"] - body["total_user_owes"]
+    assert body["total_owed_to_user"] == "250.50"
+    assert body["total_user_owes"] == "250.00"
+    assert body["net_balance"] == "0.50"
     assert body["group_count"] == 3
     assert body["group_where_user_owes_most"] == {
         "group_id": negative_group,
         "group_name": "I owe this",
-        "amount_owed": 250,
+        "amount_owed": "250.00",
     }
 
 
@@ -170,9 +177,9 @@ def test_dashboard_returns_null_largest_debt_when_user_owes_nothing(
     response = client.get("/dashboard", headers=headers(dashboard_user))
 
     assert response.status_code == 200
-    assert response.json()["total_owed_to_user"] == 80
-    assert response.json()["total_user_owes"] == 0
-    assert response.json()["net_balance"] == 80
+    assert response.json()["total_owed_to_user"] == "0.80"
+    assert response.json()["total_user_owes"] == "0.00"
+    assert response.json()["net_balance"] == "0.80"
     assert response.json()["group_where_user_owes_most"] is None
 
 

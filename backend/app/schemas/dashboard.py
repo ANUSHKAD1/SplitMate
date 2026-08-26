@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class DashboardDebtGroupResponse(BaseModel):
     group_id: int
     group_name: str
-    amount_owed: int
+    amount_owed: str
 
 
 class DashboardRecentActivityResponse(BaseModel):
@@ -20,9 +20,9 @@ class DashboardRecentActivityResponse(BaseModel):
 
 
 class DashboardResponse(BaseModel):
-    total_owed_to_user: int
-    total_user_owes: int
-    net_balance: int
+    total_owed_to_user: str
+    total_user_owes: str
+    net_balance: str
     group_count: int
     group_where_user_owes_most: DashboardDebtGroupResponse | None
     recent_activity: list[DashboardRecentActivityResponse]

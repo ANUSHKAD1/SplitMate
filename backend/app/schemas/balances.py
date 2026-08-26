@@ -4,7 +4,7 @@ from pydantic import BaseModel
 class MemberBalanceResponse(BaseModel):
     user_id: int
     name: str
-    net_balance: int
+    net_balance: str
 
 
 class DebtSuggestionResponse(BaseModel):
@@ -12,7 +12,7 @@ class DebtSuggestionResponse(BaseModel):
     from_user_name: str
     to_user_id: int
     to_user_name: str
-    amount: int
+    amount: str
 
 
 class GroupBalancesResponse(BaseModel):
