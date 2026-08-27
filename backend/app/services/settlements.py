@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session, joinedload
 from app.models import Membership, Settlement
 from app.realtime.events import emit_financial_updates, emit_group_event
 from app.services.activities import publish_activity_added, record_activity
+from app.schemas.money import paise_to_rupees
 from app.services.balances import calculate_group_balances
-
 
 class SettlementValidationError(Exception):
     """Raised when a proposed settlement cannot be applied to current balances."""
@@ -62,12 +62,12 @@ def create_settlement(
     session.add(settlement)
     try:
         activity = record_activity(
-            session,
-            group_id,
-            from_user_id,
-            "settlement_recorded",
-            f"Settlement of {amount} was recorded",
-        )
+        session,
+        group_id,
+        from_user_id,
+        "settlement_recorded",
+        f"Settlement of ₹{amount // 100}.{amount % 100:02d} was recorded",
+)
         session.commit()
     except Exception:
         session.rollback()
